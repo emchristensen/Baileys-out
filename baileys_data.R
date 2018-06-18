@@ -31,12 +31,13 @@ add_treatment = function(data){
   return(data)
 }
 # =======================================================================
-
-startdate = '1990-01-01'
+# first PB was recorded on plot 1 (spectab excl) in Sept 1995
+startdate = '1995-06-01'
 treatments = c('CC','EE','CE','EC')
+treatments = c('EC','CE','EE','CC','XC','CX','XX')
 
 
-data = portalr::abundance(path='..', level = 'Plot', type='Granivores',
+data = portalr::abundance(path='repo', level = 'Plot', type='Granivores',
                           length="All", unknowns=FALSE, min_plots = 1,
                           shape="flat", time='date',clean=F,na_drop=T)
 
