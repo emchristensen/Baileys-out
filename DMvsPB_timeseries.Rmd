@@ -1,0 +1,88 @@
+---
+title: "Rise and fall of Baileys"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+```
+
+## Get data (using portalr package)
+
+
+```{r}
+# get data
+startdate = c('1995-06-01')
+data = portalr::energy(path='repo', level = 'Plot', type='Granivores',
+                       length="All", unknowns=FALSE, min_plots = 24,
+                       shape="flat", time='date',clean=F,na_drop=T,
+                       fillweight = T)
+
+```
+
+## Recreating plots from Ernest et al 2001
+
+Plot of energy of DM and PB on controls and krat exclosures over time
+
+```{r, echo=FALSE}
+# aggregage species energy by 6 month intervals (Fig 2 from Ernest et al 2001)
+
+data$month = format(data$censusdate,'%m') %>% as.numeric()
+data$year = format(data$censusdate,'%Y') %>% as.numeric()
+data$season = rep(0)
+data$season[data$month >6] <- .5
+data$numerictime = data$year + data$season
+
+dm = data %>% filter(species == 'DM',censusdate >= startdate, treatment %in% c('control'))
+baileys = data %>% filter(species == 'PB',censusdate>=startdate, treatment %in% c('control','exclosure'))
+
+dm_6mo = aggregate(dm$energy,by=list(time = dm$numerictime),
+                      FUN = mean)
+dm_6mo$group = rep('DM_control')
+dm_6mo$treatment = rep('control')
+baileys_6mo = aggregate(baileys$energy,by=list(time=baileys$numerictime,
+                                               treatment = baileys$treatment),
+                        FUN=mean)
+baileys_6mo$group = paste0('PB_',baileys_6mo$treatment)
+DM_PB = bind_rows(dm_6mo,baileys_6mo)
+
+# plot
+ggplot(DM_PB, aes(x = time, y = x, colour=group)) +
+  geom_point() +
+  geom_line() +
+  scale_colour_brewer(type = 'qual', palette = 'Dark2') +
+  theme(legend.position = 'top') 
+
+
+```
+
+
+```{r, echo=FALSE}
+# percent compensation (Fig 1 from Ernest et al 2001)
+
+smallgrans = c('BA','PP','PB','PF','PE','PM','RM','RO','RF','PL')
+
+# total dipos and total small granivore energy
+sg = data %>% filter(species %in% smallgrans,treatment=='exclosure')
+dipos = data %>% filter(species %in% c(smallgrans,'DS','DM','DO'),treatment=='control')
+
+# sum of all species' energy by plot and period
+sg_allsp = aggregate(sg$energy,by=list(numerictime = sg$numerictime,plot=sg$plot,censusdate = sg$censusdate),FUN=sum)
+dipos_allsp = aggregate(dipos$energy,by=list(numerictime = dipos$numerictime,plot=dipos$plot,censusdate=dipos$censusdate),FUN=sum)
+
+# average month/plot total by 6 month section
+sg_6mo = aggregate(sg_allsp$x,by=list(time = sg_allsp$numerictime),FUN=mean)
+dipos_6mo = aggregate(dipos_allsp$x,by=list(time = dipos_allsp$numerictime),FUN=mean)
+
+# change column names and combine dipos and small granivores into single data frame
+colnames(sg_6mo)[colnames(sg_6mo)=="x"] <- "sg"
+colnames(dipos_6mo)[colnames(dipos_6mo)=="x"] <- "dipos"
+sg_dipos = merge(sg_6mo,dipos_6mo,by='time')
+
+# compute ratio: small granivores on exclosures / dipos+sm gran on controls
+sg_dipos$ratio = sg_dipos$sg/sg_dipos$dipos
+
+plot(sg_dipos$time,sg_dipos$ratio,type='b')
+```
+
